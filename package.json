@@ -1,7 +1,7 @@
 {
-  "name": "nimbus-swap-subgraph",
-  "version": "1.0.6",
-  "repository": "https://github.com/nimbusplatformorg/nimbus-subgraph",
+  "name": "nim-bsc-sub",
+  "version": "1.0.0",
+  "repository": "https://github.com/boriskaborisenko/nim-bsc-sub",
   "license": "GPL-3.0-or-later",
   "scripts": {
     "codegen": "graph codegen --output-dir src/types/",
