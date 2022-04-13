@@ -53,7 +53,7 @@ export function handleTransfer(event: Transfer): void {
   let value = convertTokenToDecimal(event.params.value, BI_18)
 
   // get or create transaction
-  let transaction = Transaction.load(transactionHash)!
+  let transaction = Transaction.load(transactionHash)
   if (transaction === null) {
     transaction = new Transaction(transactionHash)
     transaction.blockNumber = event.block.number
@@ -277,9 +277,16 @@ export function handleSync(event: Sync): void {
 }
 
 export function handleMint(event: Mint): void {
-  let transaction = Transaction.load(event.transaction.hash.toHexString())!
+  let transaction = Transaction.load(event.transaction.hash.toHexString());
+  if (transaction === null) {
+    return
+  }
   let mints = transaction.mints
-  let mint = MintEvent.load(mints[mints.length - 1])!
+  if (mints.length < 1) return;
+  let mint = MintEvent.load(mints[mints.length - 1])
+  if (mint === null) {
+    return;
+  }
 
   let pair = Pair.load(event.address.toHex())!
   let nimbus = NimbusFactory.load(FACTORY_ADDRESS)!
@@ -320,7 +327,8 @@ export function handleMint(event: Mint): void {
   mint.save()
 
   // update the LP position
-  let liquidityPosition = createLiquidityPosition(event.address, mint.to as Address)
+  const mintAddress = Address.fromBytes(mint.to);
+  let liquidityPosition = createLiquidityPosition(event.address, mintAddress)
   createLiquiditySnapshot(liquidityPosition, event)
 
   // update day entities
@@ -332,7 +340,7 @@ export function handleMint(event: Mint): void {
 }
 
 export function handleBurn(event: Burn): void {
-  let transaction = Transaction.load(event.transaction.hash.toHexString())!
+  let transaction = Transaction.load(event.transaction.hash.toHexString())
 
   // safety check
   if (transaction === null) {
@@ -340,7 +348,8 @@ export function handleBurn(event: Burn): void {
   }
 
   let burns = transaction.burns
-  let burn = BurnEvent.load(burns[burns.length - 1])!
+  let burn = BurnEvent.load(burns[burns.length - 1])
+  if (burn === null) return;
 
   let pair = Pair.load(event.address.toHex())!
   let nimbus = NimbusFactory.load(FACTORY_ADDRESS)!
@@ -382,7 +391,9 @@ export function handleBurn(event: Burn): void {
   burn.save()
 
   // update the LP position
-  let liquidityPosition = createLiquidityPosition(event.address, burn.sender as Address)
+  if (!burn.sender) return;
+  const burnAddress = Address.fromBytes(burn.sender!);
+  let liquidityPosition = createLiquidityPosition(event.address, burnAddress)
   createLiquiditySnapshot(liquidityPosition, event)
 
   // update day entities
@@ -462,7 +473,7 @@ export function handleSwap(event: Swap): void {
     token1.save()
     nimbus.save()
 
-    let transaction = Transaction.load(event.transaction.hash.toHexString())!
+    let transaction = Transaction.load(event.transaction.hash.toHexString())
     if (transaction === null) {
       transaction = new Transaction(event.transaction.hash.toHexString())
       transaction.blockNumber = event.block.number
