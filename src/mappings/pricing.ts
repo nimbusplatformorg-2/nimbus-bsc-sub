@@ -1,5 +1,5 @@
 /* eslint-disable prefer-const */
-import { Pair, Token, Bundle } from '../types/schema'
+import { Pair, Token, Bundle } from '../../generated/schema'
 import { BigDecimal, Address, BigInt } from '@graphprotocol/graph-ts/index'
 import { ZERO_BD, factoryContract, ADDRESS_ZERO, ONE_BD } from './helpers'
 
@@ -113,14 +113,14 @@ export function findNbuPerToken(token: Token): BigDecimal {
   for (let i = 0; i < WHITELIST.length; ++i) {
     let pairAddress = factoryContract.getPair(Address.fromString(token.id), Address.fromString(WHITELIST[i]))
     if (pairAddress.toHexString() != ADDRESS_ZERO) {
-      let pair = Pair.load(pairAddress.toHexString())
+      let pair = Pair.load(pairAddress.toHexString())!
       if (pair.token0 == token.id && pair.reserveNBU.gt(MINIMUM_LIQUIDITY_THRESHOLD_ETH)) {
-        let token1 = Token.load(pair.token1)
-        return pair.token1Price.times(token1.derivedNBU as BigDecimal) // return token1 per our token * NBU per token 1
+        let token1 = Token.load(pair.token1)!
+        return pair.token1Price.times(token1.derivedNBU! as BigDecimal) // return token1 per our token * NBU per token 1
       }
       if (pair.token1 == token.id && pair.reserveNBU.gt(MINIMUM_LIQUIDITY_THRESHOLD_ETH)) {
-        let token0 = Token.load(pair.token0)
-        return pair.token0Price.times(token0.derivedNBU as BigDecimal) // return token0 per our token * NBU per token 0
+        let token0 = Token.load(pair.token0)!
+        return pair.token0Price.times(token0.derivedNBU! as BigDecimal) // return token0 per our token * NBU per token 0
       }
     }
   }
@@ -140,9 +140,9 @@ export function getTrackedVolumeUSD(
   token1: Token,
   pair: Pair
 ): BigDecimal {
-  let bundle = Bundle.load('1')
-  let price0 = token0.derivedNBU.times(bundle.nbuPrice)
-  let price1 = token1.derivedNBU.times(bundle.nbuPrice)
+  let bundle = Bundle.load('1')!
+  let price0 = token0.derivedNBU!.times(bundle.nbuPrice)
+  let price1 = token1.derivedNBU!.times(bundle.nbuPrice)
 
   // if less than 5 LPs, require high minimum reserve amount amount or return 0
   if (pair.liquidityProviderCount.lt(BigInt.fromI32(5))) { //TODO: remove to 5
@@ -199,9 +199,9 @@ export function getTrackedLiquidityUSD(
   tokenAmount1: BigDecimal,
   token1: Token
 ): BigDecimal {
-  let bundle = Bundle.load('1')
-  let price0 = token0.derivedNBU.times(bundle.nbuPrice)
-  let price1 = token1.derivedNBU.times(bundle.nbuPrice)
+  let bundle = Bundle.load('1')!
+  let price0 = token0.derivedNBU!.times(bundle.nbuPrice)
+  let price1 = token1.derivedNBU!.times(bundle.nbuPrice)
 
   // both are whitelist tokens, take average of both amounts
   if (WHITELIST.includes(token0.id) && WHITELIST.includes(token1.id)) {

@@ -9,8 +9,8 @@ import {
   Burn as BurnEvent,
   Swap as SwapEvent,
   Bundle
-} from '../types/schema'
-import { Pair as PairContract, Mint, Burn, Swap, Transfer, Sync } from '../types/templates/Pair/Pair'
+} from '../../generated/schema'
+import { Pair as PairContract, Mint, Burn, Swap, Transfer, Sync } from '../../generated/templates/Pair/Pair'
 import { updatePairDayData, updateTokenDayData, updateNimbusDayData, updatePairHourData } from './dayUpdates'
 import { getNbuPriceInUSD, findNbuPerToken, getTrackedVolumeUSD, getTrackedLiquidityUSD } from './pricing'
 import {
@@ -26,7 +26,8 @@ import {
 } from './helpers'
 
 function isCompleteMint(mintId: string): boolean {
-  return MintEvent.load(mintId).sender !== null // sufficient checks
+  const mint = MintEvent.load(mintId);
+  return !mint || mint.sender !== null // sufficient checks
 }
 
 export function handleTransfer(event: Transfer): void {
@@ -35,7 +36,7 @@ export function handleTransfer(event: Transfer): void {
     return
   }
 
-  let factory = NimbusFactory.load(FACTORY_ADDRESS)
+  let factory = NimbusFactory.load(FACTORY_ADDRESS)!
   let transactionHash = event.transaction.hash.toHexString()
 
   // user stats
@@ -45,14 +46,14 @@ export function handleTransfer(event: Transfer): void {
   createUser(to)
 
   // get pair and load contract
-  let pair = Pair.load(event.address.toHexString())
+  let pair = Pair.load(event.address.toHexString())!
   let pairContract = PairContract.bind(event.address)
 
   // liquidity token amount being transfered
   let value = convertTokenToDecimal(event.params.value, BI_18)
 
   // get or create transaction
-  let transaction = Transaction.load(transactionHash)
+  let transaction = Transaction.load(transactionHash)!
   if (transaction === null) {
     transaction = new Transaction(transactionHash)
     transaction.blockNumber = event.block.number
@@ -129,7 +130,7 @@ export function handleTransfer(event: Transfer): void {
     let burns = transaction.burns
     let burn: BurnEvent
     if (burns.length > 0) {
-      let currentBurn = BurnEvent.load(burns[burns.length - 1])
+      let currentBurn = BurnEvent.load(burns[burns.length - 1])!
       if (currentBurn.needsComplete) {
         burn = currentBurn as BurnEvent
       } else {
@@ -163,7 +164,7 @@ export function handleTransfer(event: Transfer): void {
 
     // if this logical burn included a fee mint, account for this
     if (mints.length !== 0 && !isCompleteMint(mints[mints.length - 1])) {
-      let mint = MintEvent.load(mints[mints.length - 1])
+      let mint = MintEvent.load(mints[mints.length - 1])!
       burn.feeTo = mint.to
       burn.feeLiquidity = mint.liquidity
       // remove the logical mint
@@ -211,10 +212,10 @@ export function handleTransfer(event: Transfer): void {
 }
 
 export function handleSync(event: Sync): void {
-  let pair = Pair.load(event.address.toHex())
-  let token0 = Token.load(pair.token0)
-  let token1 = Token.load(pair.token1)
-  let nimbus = NimbusFactory.load(FACTORY_ADDRESS)
+  let pair = Pair.load(event.address.toHex())!
+  let token0 = Token.load(pair.token0)!
+  let token1 = Token.load(pair.token1)!
+  let nimbus = NimbusFactory.load(FACTORY_ADDRESS)!
 
   // reset factory liquidity by subtracting onluy tarcked liquidity
   nimbus.totalLiquidityNBU = nimbus.totalLiquidityNBU.minus(pair.trackedReserveNBU as BigDecimal)
@@ -234,12 +235,12 @@ export function handleSync(event: Sync): void {
   pair.save()
 
   // update NBU price now that reserves could have changed
-  let bundle = Bundle.load('1')
+  let bundle = Bundle.load('1')!
   bundle.nbuPrice = getNbuPriceInUSD()
   bundle.save()
 
-  token0.derivedNBU = findNbuPerToken(token0 as Token)
-  token1.derivedNBU = findNbuPerToken(token1 as Token)
+  token0.derivedNBU! = findNbuPerToken(token0 as Token)
+  token1.derivedNBU! = findNbuPerToken(token1 as Token)
   token0.save()
   token1.save()
 
@@ -256,8 +257,8 @@ export function handleSync(event: Sync): void {
   // use derived amounts within pair
   pair.trackedReserveNBU = trackedLiquidityNBU
   pair.reserveNBU = pair.reserve0
-    .times(token0.derivedNBU as BigDecimal)
-    .plus(pair.reserve1.times(token1.derivedNBU as BigDecimal))
+    .times(token0.derivedNBU! as BigDecimal)
+    .plus(pair.reserve1.times(token1.derivedNBU! as BigDecimal))
   pair.reserveUSD = pair.reserveNBU.times(bundle.nbuPrice)
 
   // use tracked amounts globally
@@ -276,15 +277,15 @@ export function handleSync(event: Sync): void {
 }
 
 export function handleMint(event: Mint): void {
-  let transaction = Transaction.load(event.transaction.hash.toHexString())
+  let transaction = Transaction.load(event.transaction.hash.toHexString())!
   let mints = transaction.mints
-  let mint = MintEvent.load(mints[mints.length - 1])
+  let mint = MintEvent.load(mints[mints.length - 1])!
 
-  let pair = Pair.load(event.address.toHex())
-  let nimbus = NimbusFactory.load(FACTORY_ADDRESS)
+  let pair = Pair.load(event.address.toHex())!
+  let nimbus = NimbusFactory.load(FACTORY_ADDRESS)!
 
-  let token0 = Token.load(pair.token0)
-  let token1 = Token.load(pair.token1)
+  let token0 = Token.load(pair.token0)!
+  let token1 = Token.load(pair.token1)!
 
   // update exchange info (except balances, sync will cover that)
   let token0Amount = convertTokenToDecimal(event.params.amount0, token0.decimals)
@@ -295,10 +296,10 @@ export function handleMint(event: Mint): void {
   token1.txCount = token1.txCount.plus(ONE_BI)
 
   // get new amounts of USD and NBU for tracking
-  let bundle = Bundle.load('1')
-  let amountTotalUSD = token1.derivedNBU
+  let bundle = Bundle.load('1')!
+  let amountTotalUSD = token1.derivedNBU!
     .times(token1Amount)
-    .plus(token0.derivedNBU.times(token0Amount))
+    .plus(token0.derivedNBU!.times(token0Amount))
     .times(bundle.nbuPrice)
 
   // update txn counts
@@ -331,7 +332,7 @@ export function handleMint(event: Mint): void {
 }
 
 export function handleBurn(event: Burn): void {
-  let transaction = Transaction.load(event.transaction.hash.toHexString())
+  let transaction = Transaction.load(event.transaction.hash.toHexString())!
 
   // safety check
   if (transaction === null) {
@@ -339,14 +340,14 @@ export function handleBurn(event: Burn): void {
   }
 
   let burns = transaction.burns
-  let burn = BurnEvent.load(burns[burns.length - 1])
+  let burn = BurnEvent.load(burns[burns.length - 1])!
 
-  let pair = Pair.load(event.address.toHex())
-  let nimbus = NimbusFactory.load(FACTORY_ADDRESS)
+  let pair = Pair.load(event.address.toHex())!
+  let nimbus = NimbusFactory.load(FACTORY_ADDRESS)!
 
   //update token info
-  let token0 = Token.load(pair.token0)
-  let token1 = Token.load(pair.token1)
+  let token0 = Token.load(pair.token0)!
+  let token1 = Token.load(pair.token1)!
   let token0Amount = convertTokenToDecimal(event.params.amount0, token0.decimals)
   let token1Amount = convertTokenToDecimal(event.params.amount1, token1.decimals)
 
@@ -355,10 +356,10 @@ export function handleBurn(event: Burn): void {
   token1.txCount = token1.txCount.plus(ONE_BI)
 
   // get new amounts of USD and NBU for tracking
-  let bundle = Bundle.load('1')
-  let amountTotalUSD = token1.derivedNBU
+  let bundle = Bundle.load('1')!
+  let amountTotalUSD = token1.derivedNBU!
     .times(token1Amount)
-    .plus(token0.derivedNBU.times(token0Amount))
+    .plus(token0.derivedNBU!.times(token0Amount))
     .times(bundle.nbuPrice)
 
   // update txn counts
@@ -393,153 +394,155 @@ export function handleBurn(event: Burn): void {
 }
 
 export function handleSwap(event: Swap): void {
-  let pair = Pair.load(event.address.toHexString())
+  let pair = Pair.load(event.address.toHexString())!
   let token0 = Token.load(pair.token0)
   let token1 = Token.load(pair.token1)
-  let amount0In = convertTokenToDecimal(event.params.amount0In, token0.decimals)
-  let amount1In = convertTokenToDecimal(event.params.amount1In, token1.decimals)
-  let amount0Out = convertTokenToDecimal(event.params.amount0Out, token0.decimals)
-  let amount1Out = convertTokenToDecimal(event.params.amount1Out, token1.decimals)
+  if (token0 && token1) {
+    let amount0In = convertTokenToDecimal(event.params.amount0In, token0.decimals)
+    let amount1In = convertTokenToDecimal(event.params.amount1In, token1.decimals)
+    let amount0Out = convertTokenToDecimal(event.params.amount0Out, token0.decimals)
+    let amount1Out = convertTokenToDecimal(event.params.amount1Out, token1.decimals)
 
-  // totals for volume updates
-  let amount0Total = amount0Out.plus(amount0In)
-  let amount1Total = amount1Out.plus(amount1In)
+    // totals for volume updates
+    let amount0Total = amount0Out.plus(amount0In)
+    let amount1Total = amount1Out.plus(amount1In)
 
-  // NBU/USD prices
-  let bundle = Bundle.load('1')
+    // NBU/USD prices
+    let bundle = Bundle.load('1')!
 
-  // get total amounts of derived USD and NBU for tracking
-  let derivedAmountNBU = token1.derivedNBU
-    .times(amount1Total)
-    .plus(token0.derivedNBU.times(amount0Total))
-    .div(BigDecimal.fromString('2'))
-  let derivedAmountUSD = derivedAmountNBU.times(bundle.nbuPrice)
+    // get total amounts of derived USD and NBU for tracking
+    let derivedAmountNBU = token1.derivedNBU!
+      .times(amount1Total)
+      .plus(token0.derivedNBU!.times(amount0Total))
+      .div(BigDecimal.fromString('2'))
+    let derivedAmountUSD = derivedAmountNBU.times(bundle.nbuPrice)
 
-  // only accounts for volume through white listed tokens
-  let trackedAmountUSD = getTrackedVolumeUSD(amount0Total, token0 as Token, amount1Total, token1 as Token, pair as Pair)
+    // only accounts for volume through white listed tokens
+    let trackedAmountUSD = getTrackedVolumeUSD(amount0Total, token0 as Token, amount1Total, token1 as Token, pair as Pair)
 
-  let trackedAmountNBU: BigDecimal
-  if (bundle.nbuPrice.equals(ZERO_BD)) {
-    trackedAmountNBU = ZERO_BD
-  } else {
-    trackedAmountNBU = trackedAmountUSD.div(bundle.nbuPrice)
+    let trackedAmountNBU: BigDecimal
+    if (bundle.nbuPrice.equals(ZERO_BD)) {
+      trackedAmountNBU = ZERO_BD
+    } else {
+      trackedAmountNBU = trackedAmountUSD.div(bundle.nbuPrice)
+    }
+
+    // update token0 global volume and token liquidity stats
+    token0.tradeVolume = token0.tradeVolume.plus(amount0In.plus(amount0Out))
+    token0.tradeVolumeUSD = token0.tradeVolumeUSD.plus(trackedAmountUSD)
+    token0.untrackedVolumeUSD = token0.untrackedVolumeUSD.plus(derivedAmountUSD)
+
+    // update token1 global volume and token liquidity stats
+    token1.tradeVolume = token1.tradeVolume.plus(amount1In.plus(amount1Out))
+    token1.tradeVolumeUSD = token1.tradeVolumeUSD.plus(trackedAmountUSD)
+    token1.untrackedVolumeUSD = token1.untrackedVolumeUSD.plus(derivedAmountUSD)
+
+    // update txn counts
+    token0.txCount = token0.txCount.plus(ONE_BI)
+    token1.txCount = token1.txCount.plus(ONE_BI)
+
+    // update pair volume data, use tracked amount if we have it as its probably more accurate
+    pair.volumeUSD = pair.volumeUSD.plus(trackedAmountUSD)
+    pair.volumeToken0 = pair.volumeToken0.plus(amount0Total)
+    pair.volumeToken1 = pair.volumeToken1.plus(amount1Total)
+    pair.untrackedVolumeUSD = pair.untrackedVolumeUSD.plus(derivedAmountUSD)
+    pair.txCount = pair.txCount.plus(ONE_BI)
+    pair.save()
+
+    // update global values, only used tracked amounts for volume
+    let nimbus = NimbusFactory.load(FACTORY_ADDRESS)!
+    nimbus.totalVolumeUSD = nimbus.totalVolumeUSD.plus(trackedAmountUSD)
+    nimbus.totalVolumeNBU = nimbus.totalVolumeNBU.plus(trackedAmountNBU)
+    nimbus.untrackedVolumeUSD = nimbus.untrackedVolumeUSD.plus(derivedAmountUSD)
+    nimbus.txCount = nimbus.txCount.plus(ONE_BI)
+
+    // save entities
+    pair.save()
+    token0.save()
+    token1.save()
+    nimbus.save()
+
+    let transaction = Transaction.load(event.transaction.hash.toHexString())!
+    if (transaction === null) {
+      transaction = new Transaction(event.transaction.hash.toHexString())
+      transaction.blockNumber = event.block.number
+      transaction.timestamp = event.block.timestamp
+      transaction.mints = []
+      transaction.swaps = []
+      transaction.burns = []
+    }
+    let swaps = transaction.swaps
+    let swap = new SwapEvent(
+      event.transaction.hash
+        .toHexString()
+        .concat('-')
+        .concat(BigInt.fromI32(swaps.length).toString())
+    )
+
+    // update swap event
+    swap.transaction = transaction.id
+    swap.pair = pair.id
+    swap.timestamp = transaction.timestamp
+    swap.transaction = transaction.id
+    swap.sender = event.params.sender
+    swap.amount0In = amount0In
+    swap.amount1In = amount1In
+    swap.amount0Out = amount0Out
+    swap.amount1Out = amount1Out
+    swap.to = event.params.to
+    swap.from = event.transaction.from
+    swap.logIndex = event.logIndex
+    // use the tracked amount if we have it
+    swap.amountUSD = trackedAmountUSD === ZERO_BD ? derivedAmountUSD : trackedAmountUSD
+    swap.save()
+
+    // update the transaction
+
+    // TODO: Consider using .concat() for handling array updates to protect
+    // against unintended side effects for other code paths.
+    swaps.push(swap.id)
+    transaction.swaps = swaps
+    transaction.save()
+
+    // update day entities
+    let pairDayData = updatePairDayData(event)
+    let pairHourData = updatePairHourData(event)
+    let nimbusDayData = updateNimbusDayData(event)
+    let token0DayData = updateTokenDayData(token0 as Token, event)
+    let token1DayData = updateTokenDayData(token1 as Token, event)
+
+    // swap specific updating
+    nimbusDayData.dailyVolumeUSD = nimbusDayData.dailyVolumeUSD.plus(trackedAmountUSD)
+    nimbusDayData.dailyVolumeNBU = nimbusDayData.dailyVolumeNBU.plus(trackedAmountNBU)
+    nimbusDayData.dailyVolumeUntracked = nimbusDayData.dailyVolumeUntracked.plus(derivedAmountUSD)
+    nimbusDayData.save()
+
+    // swap specific updating for pair
+    pairDayData.dailyVolumeToken0 = pairDayData.dailyVolumeToken0.plus(amount0Total)
+    pairDayData.dailyVolumeToken1 = pairDayData.dailyVolumeToken1.plus(amount1Total)
+    pairDayData.dailyVolumeUSD = pairDayData.dailyVolumeUSD.plus(trackedAmountUSD)
+    pairDayData.save()
+
+    // update hourly pair data
+    pairHourData.hourlyVolumeToken0 = pairHourData.hourlyVolumeToken0.plus(amount0Total)
+    pairHourData.hourlyVolumeToken1 = pairHourData.hourlyVolumeToken1.plus(amount1Total)
+    pairHourData.hourlyVolumeUSD = pairHourData.hourlyVolumeUSD.plus(trackedAmountUSD)
+    pairHourData.save()
+
+    // swap specific updating for token0
+    token0DayData.dailyVolumeToken = token0DayData.dailyVolumeToken.plus(amount0Total)
+    token0DayData.dailyVolumeNBU = token0DayData.dailyVolumeNBU.plus(amount0Total.times(token1.derivedNBU! as BigDecimal))
+    token0DayData.dailyVolumeUSD = token0DayData.dailyVolumeUSD.plus(
+      amount0Total.times(token0.derivedNBU! as BigDecimal).times(bundle.nbuPrice)
+    )
+    token0DayData.save()
+
+    // swap specific updating
+    token1DayData.dailyVolumeToken = token1DayData.dailyVolumeToken.plus(amount1Total)
+    token1DayData.dailyVolumeNBU = token1DayData.dailyVolumeNBU.plus(amount1Total.times(token1.derivedNBU! as BigDecimal))
+    token1DayData.dailyVolumeUSD = token1DayData.dailyVolumeUSD.plus(
+      amount1Total.times(token1.derivedNBU! as BigDecimal).times(bundle.nbuPrice)
+    )
+    token1DayData.save()
   }
-
-  // update token0 global volume and token liquidity stats
-  token0.tradeVolume = token0.tradeVolume.plus(amount0In.plus(amount0Out))
-  token0.tradeVolumeUSD = token0.tradeVolumeUSD.plus(trackedAmountUSD)
-  token0.untrackedVolumeUSD = token0.untrackedVolumeUSD.plus(derivedAmountUSD)
-
-  // update token1 global volume and token liquidity stats
-  token1.tradeVolume = token1.tradeVolume.plus(amount1In.plus(amount1Out))
-  token1.tradeVolumeUSD = token1.tradeVolumeUSD.plus(trackedAmountUSD)
-  token1.untrackedVolumeUSD = token1.untrackedVolumeUSD.plus(derivedAmountUSD)
-
-  // update txn counts
-  token0.txCount = token0.txCount.plus(ONE_BI)
-  token1.txCount = token1.txCount.plus(ONE_BI)
-
-  // update pair volume data, use tracked amount if we have it as its probably more accurate
-  pair.volumeUSD = pair.volumeUSD.plus(trackedAmountUSD)
-  pair.volumeToken0 = pair.volumeToken0.plus(amount0Total)
-  pair.volumeToken1 = pair.volumeToken1.plus(amount1Total)
-  pair.untrackedVolumeUSD = pair.untrackedVolumeUSD.plus(derivedAmountUSD)
-  pair.txCount = pair.txCount.plus(ONE_BI)
-  pair.save()
-
-  // update global values, only used tracked amounts for volume
-  let nimbus = NimbusFactory.load(FACTORY_ADDRESS)
-  nimbus.totalVolumeUSD = nimbus.totalVolumeUSD.plus(trackedAmountUSD)
-  nimbus.totalVolumeNBU = nimbus.totalVolumeNBU.plus(trackedAmountNBU)
-  nimbus.untrackedVolumeUSD = nimbus.untrackedVolumeUSD.plus(derivedAmountUSD)
-  nimbus.txCount = nimbus.txCount.plus(ONE_BI)
-
-  // save entities
-  pair.save()
-  token0.save()
-  token1.save()
-  nimbus.save()
-
-  let transaction = Transaction.load(event.transaction.hash.toHexString())
-  if (transaction === null) {
-    transaction = new Transaction(event.transaction.hash.toHexString())
-    transaction.blockNumber = event.block.number
-    transaction.timestamp = event.block.timestamp
-    transaction.mints = []
-    transaction.swaps = []
-    transaction.burns = []
-  }
-  let swaps = transaction.swaps
-  let swap = new SwapEvent(
-    event.transaction.hash
-      .toHexString()
-      .concat('-')
-      .concat(BigInt.fromI32(swaps.length).toString())
-  )
-
-  // update swap event
-  swap.transaction = transaction.id
-  swap.pair = pair.id
-  swap.timestamp = transaction.timestamp
-  swap.transaction = transaction.id
-  swap.sender = event.params.sender
-  swap.amount0In = amount0In
-  swap.amount1In = amount1In
-  swap.amount0Out = amount0Out
-  swap.amount1Out = amount1Out
-  swap.to = event.params.to
-  swap.from = event.transaction.from
-  swap.logIndex = event.logIndex
-  // use the tracked amount if we have it
-  swap.amountUSD = trackedAmountUSD === ZERO_BD ? derivedAmountUSD : trackedAmountUSD
-  swap.save()
-
-  // update the transaction
-
-  // TODO: Consider using .concat() for handling array updates to protect
-  // against unintended side effects for other code paths.
-  swaps.push(swap.id)
-  transaction.swaps = swaps
-  transaction.save()
-
-  // update day entities
-  let pairDayData = updatePairDayData(event)
-  let pairHourData = updatePairHourData(event)
-  let nimbusDayData = updateNimbusDayData(event)
-  let token0DayData = updateTokenDayData(token0 as Token, event)
-  let token1DayData = updateTokenDayData(token1 as Token, event)
-
-  // swap specific updating
-  nimbusDayData.dailyVolumeUSD = nimbusDayData.dailyVolumeUSD.plus(trackedAmountUSD)
-  nimbusDayData.dailyVolumeNBU = nimbusDayData.dailyVolumeNBU.plus(trackedAmountNBU)
-  nimbusDayData.dailyVolumeUntracked = nimbusDayData.dailyVolumeUntracked.plus(derivedAmountUSD)
-  nimbusDayData.save()
-
-  // swap specific updating for pair
-  pairDayData.dailyVolumeToken0 = pairDayData.dailyVolumeToken0.plus(amount0Total)
-  pairDayData.dailyVolumeToken1 = pairDayData.dailyVolumeToken1.plus(amount1Total)
-  pairDayData.dailyVolumeUSD = pairDayData.dailyVolumeUSD.plus(trackedAmountUSD)
-  pairDayData.save()
-
-  // update hourly pair data
-  pairHourData.hourlyVolumeToken0 = pairHourData.hourlyVolumeToken0.plus(amount0Total)
-  pairHourData.hourlyVolumeToken1 = pairHourData.hourlyVolumeToken1.plus(amount1Total)
-  pairHourData.hourlyVolumeUSD = pairHourData.hourlyVolumeUSD.plus(trackedAmountUSD)
-  pairHourData.save()
-
-  // swap specific updating for token0
-  token0DayData.dailyVolumeToken = token0DayData.dailyVolumeToken.plus(amount0Total)
-  token0DayData.dailyVolumeNBU = token0DayData.dailyVolumeNBU.plus(amount0Total.times(token1.derivedNBU as BigDecimal))
-  token0DayData.dailyVolumeUSD = token0DayData.dailyVolumeUSD.plus(
-    amount0Total.times(token0.derivedNBU as BigDecimal).times(bundle.nbuPrice)
-  )
-  token0DayData.save()
-
-  // swap specific updating
-  token1DayData.dailyVolumeToken = token1DayData.dailyVolumeToken.plus(amount1Total)
-  token1DayData.dailyVolumeNBU = token1DayData.dailyVolumeNBU.plus(amount1Total.times(token1.derivedNBU as BigDecimal))
-  token1DayData.dailyVolumeUSD = token1DayData.dailyVolumeUSD.plus(
-    amount1Total.times(token1.derivedNBU as BigDecimal).times(bundle.nbuPrice)
-  )
-  token1DayData.save()
 }

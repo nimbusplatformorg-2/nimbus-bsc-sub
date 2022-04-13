@@ -10,10 +10,10 @@ dataSources:
     source:
       address: "0xcC8b849f5f18bb79aF3aF5B29F91bE38675E20a8"
       abi: Factory
-      startBlock: 6007809
+      startBlock: 8111163
     mapping:
       kind: ethereum/events
-      apiVersion: 0.0.3
+      apiVersion: 0.0.6
       language: wasm/assemblyscript
       file: Factory/Factory.wasm
       entities:
@@ -39,7 +39,7 @@ templates:
       abi: Pair
     mapping:
       kind: ethereum/events
-      apiVersion: 0.0.3
+      apiVersion: 0.0.6
       language: wasm/assemblyscript
       file: templates/Pair/Pair.wasm
       entities:
